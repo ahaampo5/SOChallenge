@@ -5,10 +5,14 @@ import torch
 from torch.utils.data import DataLoader
 
 # baseline model
-from src.model import BASELINE_MODEL
-from src.utils import train, generate_dboxes, Encoder, BaseTransform
-from src.loss import Loss
-from src.dataset import collate_fn, Small_dataset, prepocessing
+from src.model import build_model
+from src.utils import train
+from src.dataset import collate_fn, Small_dataset
+
+# albumentation
+import cv2
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
 
 # nsml
 import nsml
@@ -18,7 +22,7 @@ from nsml import DATASET_PATH
 def test_preprocessing(img, transform=None):
     # [참가자 TO-DO] inference를 위한 이미지 데이터 전처리
     if transform is not None:
-        img = transform(img)
+        img = transform(img)['image']
         img = img.unsqueeze(0)
     return img
 
@@ -34,6 +38,12 @@ def bind_model(model):
         model.load_state_dict(checkpoint["model"])
         print('model loaded!')
 
+    def get_test_transform():
+        return A.Compose([
+        A.Resize(512,512),
+        ToTensorV2(p=1.0)
+    ])
+
     def infer(test_img_path_list): # data_loader에서 인자 받음
         '''
         반환 형식 준수해야 정상적으로 score가 기록됩니다.
@@ -42,57 +52,40 @@ def bind_model(model):
         result_dict = {}
 
         # for baseline model ==============================
-        import torchvision.transforms as transforms
-        from PIL import Image
         from tqdm import tqdm
-
-        infer_transforms = transforms.Compose([
-                transforms.Resize((300,300)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.5], std=[0.5])
-            ])
-        dboxes = generate_dboxes() 
-        encoder = Encoder(dboxes) # inference시 박스 좌표로 후처리하는 모듈
 
         model.cuda()
         model.eval()
 
         for _, file_path in enumerate(tqdm(test_img_path_list)):
             file_name = file_path.split("/")[-1]
-            img = Image.open(file_path)
+            img = cv2.imread(file_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
+            img /= 255.0
+
             width, height = img.size
 
-            img = test_preprocessing(img, infer_transforms)
+            img = test_preprocessing(img, get_test_transform())
             img = img.cuda()
             detections = []
 
             with torch.no_grad():
-                ploc, plabel = model(img)
-                ploc, plabel = ploc.float().detach().cpu(), plabel.float().detach().cpu()
+                pred = model(img)
 
-                try:
-                    result = encoder.decode_batch(ploc, plabel, 0.5, 100)[0]
-                except:
-                    print("No object detected : ", file_name)
-                    continue
+                boxes = pred['boxes'].float().detach().cpu()
+                scores = pred['score'].float().detach().cpu()
+                labels = pred['labels'].float().detach().cpu()
 
-                loc, label, prob = [r.numpy() for r in result]
-                for loc_, label_, prob_ in zip(loc, label, prob):
-                    try:
-                        '''
-                        결과 기록 형식, 데이터 타입 준수해야 함
-                        pred_cls, x, y, w, h, confidence
-                        '''
+                for box_, score_, label_ in zip(boxes, scores, labels):
+                    if scores_ > 0.5:
                         detections.append([
                             int(label_)-1,
-                            float( loc_[0] * width ), 
-                            float( loc_[1] * height ), 
-                            float( (loc_[2] - loc_[0]) * width ),
-                            float( (loc_[3] - loc_[1]) * height ), 
-                            float( prob_ )
+                            float( box_[0] * width ), 
+                            float( box_[1] * height ), 
+                            float( (box_[2] - box_[0]) * width ),
+                            float( (box_[3] - box_[1]) * height ), 
+                            float( score_ )
                             ])
-                    except:
-                        continue
 
             result_dict[file_name] = detections # 반환 형식 준수해야 함
         return result_dict
@@ -115,15 +108,22 @@ def get_args():
     args = parser.parse_args()
     return args
 
+def get_train_transform():
+    return A.Compose([
+        A.Resize(512,512),
+        A.HorizontalFlip(p=0.5),
+        A.RandomRotate90(p=0.3),
+        A.VerticalFlip(p=0.4),
+        ToTensorV2(p=1.0)
+    ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
+
 def main(opt):
-    
-    torch.manual_seed(123)
+    torch.manual_seed(41)
     num_class = 30 # 순수한 데이터셋 클래스 개수
 
-    # baseline model
-    dboxes = generate_dboxes()
-    model = BASELINE_MODEL(num_classes=num_class+1) # 배경 class 포함 모델
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.937, 0.999))
+    # define model
+    model = build_model(num_classes=num_class+1) # 배경 class 포함 모델
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
     scheduler = None
 
     bind_model(model)
@@ -131,14 +131,11 @@ def main(opt):
     if opt.pause:
         nsml.paused(scope=locals())
     else:
-        # loss
-        criterion = Loss(dboxes)
-
         # train data
         with open(os.path.join(DATASET_PATH, 'train', 'train_label'), 'r', encoding="utf-8") as f:
             train_data_dict = json.load(f)
             train_img_label = prepocessing(root_dir=os.path.join(DATASET_PATH, 'train', 'train_data'),\
-                label_data=train_data_dict, input_size=(300,300))
+                label_data=train_data_dict, input_size=(512,512))
         
         train_params = {"batch_size": opt.batch_size,
                         "shuffle": True,
@@ -147,14 +144,13 @@ def main(opt):
                         "collate_fn": collate_fn}
 
         # data loader
-        train_data = Small_dataset(train_img_label, num_class, BaseTransform(dboxes))
+        train_data = Small_dataset(train_img_label, num_class, get_train_transform())
         train_loader = DataLoader(train_data, **train_params)
 
         model.cuda()
-        criterion.cuda()
 
         for epoch in range(0, opt.epochs):
-            train_loss = train(model, train_loader, epoch, criterion, optimizer, scheduler)
+            train_loss = train(model, train_loader, epoch, optimizer, scheduler)
             nsml.report(
                 epoch=epoch,
                 epoch_total=opt.epochs,

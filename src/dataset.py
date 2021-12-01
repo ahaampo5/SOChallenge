@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 import os
 import numpy as np
-from PIL import Image
+import cv2
 import pickle
 from tqdm import tqdm
 
@@ -18,9 +18,8 @@ def collate_fn(batch):
 
 # [참가자 TO-DO] custom dataset
 class Small_dataset(Dataset):
-    def __init__(self, label_data, num_classes=80, transform=None):
+    def __init__(self, label_data, transform=None):
         self.label_data = label_data
-        self.num_class = num_classes + 1 # 배경 포함 모델
         self.transform = transform
 
         self.img_list = self.label_data['data']
@@ -30,18 +29,30 @@ class Small_dataset(Dataset):
         return len(self.img_list)
     
     def __getitem__(self, index):
-        image = self.img_list[index].copy()
+        image = cv2.imread(self.img_list[index])
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        image /= 255.0
         label = self.label_list[index]
 
         height, width = label[0]
-        labels = label[1].clone()
-        boxes = label[2].clone()
+        t_labels = label[1].clone()
+        t_boxes = label[2].clone()
 
         # [참가자 TO-DO] 모델에 맞는 전처리 코드로 채우면 됩니다. 
-        if self.transform is not None:
-            image, (height, width), boxes, labels =\
-                self.transform(image, (height, width), boxes, labels)
-        return image, int(index), (height, width), boxes, labels
+        if self.transforms:
+            sample = {
+                'image': image,
+                'bboxes': t_boxes,
+                'labels': t_labels
+            }
+            sample = self.transforms(**sample)
+            image = sample['image']
+            target = {
+                'boxes':torch.tensor(sample['bboxes'], dtype=torch.float32),
+                'labels':torch.tensor(sample['labels'], dtype=torch.int64)
+            }
+
+        return image, int(index), (height, width), target
 
 # [참가자 TO-DO] 효율적인 훈련 시간을 위한 preprocessing / 사용하지 않아도 무방합니다.
 def prepocessing(root_dir, label_data, input_size):
@@ -49,11 +60,9 @@ def prepocessing(root_dir, label_data, input_size):
     img_list = []
     label_list = []
 
-    print("Starting Caching...")
-    for idx, cur_file in enumerate(tqdm(img_file_list)):
-        image = Image.open(os.path.join(root_dir, cur_file))
+    for idx, cur_file in enumerate(img_file_list):
+        img_list.append(os.path.join(root_dir, cur_file))
         width, height = image.size
-        img_list.append(image.resize(input_size))
 
         # 원본 레이블 형식 list [cls, x, y, w, h]
         cur_label = np.array(label_data[cur_file])
@@ -66,8 +75,8 @@ def prepocessing(root_dir, label_data, input_size):
             labels.append(int(label[0]+1))
 
             # model 형식에 맞게 변환 필요 (ex. xywh -> (normalized left,top,right,bottom)
-            boxes.append([label[1] / width, label[2] / height, 
-                (label[1] + label[3]) / width, (label[2]+label[4]) / height])
+            # modify : xywh -> xyxy
+            boxes.append([label[1], label[2], (label[1] + label[3]), (label[2]+label[4])])
 
         boxes = torch.tensor(boxes, dtype=torch.float32)
         labels = torch.tensor(labels)
@@ -76,7 +85,6 @@ def prepocessing(root_dir, label_data, input_size):
     
     data_dict = {
         'data':img_list,
-        'label':label_list  
+        'label':label_list
     }
-
     return data_dict

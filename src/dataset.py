@@ -125,7 +125,7 @@ def convert_to_coco_train(json_path, classes, coco_dict):
         for label, x, y, w, h in json_data[key]:
             label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
             annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
-                            'ignore':0, 'segmentation': []})
+                            'innore':0, 'segmentation': []})
             classes_count[int(label)] += 1
             anno_idx += 1
         img_idx += 1
@@ -138,7 +138,7 @@ def convert_to_coco_train(json_path, classes, coco_dict):
     with open(os.path.join(CUR_PATH, 'all_train.json'), 'w', encoding='utf-8') as jfile:
         json.dump(coco_dict, jfile)
   
-    print(classes_count)
+    return classes_count
 
 def convert_to_coco_valid(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
@@ -167,7 +167,7 @@ def convert_to_coco_valid(json_path, classes, coco_dict):
                 for label, x, y, w, h in json_data[key]:
                     label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
                     annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h),\
-                        'area':w*h, 'iscrowd':0, 'ignore':0, 'segmentation': []})
+                        'area':w*h, 'iscrowd':0, 'innore':0, 'segmentation': []})
                     classes_count[int(label)] += 1
                     anno_idx += 1
                 img_idx += 1
@@ -179,6 +179,8 @@ def convert_to_coco_valid(json_path, classes, coco_dict):
     CUR_PATH = os.getcwd()
     with open(os.path.join(CUR_PATH, 'valid.json'), 'w', encoding='utf-8') as jfile:
         json.dump(coco_dict, jfile)
+  
+    return classes_count
 
 if __name__ == '__main__':
     coco_dict = dict(

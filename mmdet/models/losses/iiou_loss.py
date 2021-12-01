@@ -12,20 +12,20 @@ from .utils import weighted_loss
 @mmcv.jit(derivate=True, coderize=True)
 @weighted_loss
 def iiou(pred, target):
-    S_p = abs((pred[:2] - pred[:0]) * (pred[:3] - pred[:1]))
-    S   = abs((target[:2] - target[:0]) * (target[:3] - target[:1]))
+    S_p = abs((pred[:,2] - pred[:,0]) * (pred[:,3] - pred[:,1]))
+    S   = abs((target[:,2] - target[:,0]) * (target[:,3] - target[:,1]))
 
-    overlap_x_max = min(pred[:2], target[:2])
-    overlap_x_min = max(pred[:0], target[:0])
-    overlap_y_max = min(pred[:3], target[:3])
-    overlap_y_min = max(pred[:0], target[:0])
+    overlap_x_max = torch.min(pred[:,2], target[:,2])
+    overlap_x_min = torch.max(pred[:,0], target[:,0])
+    overlap_y_max = torch.min(pred[:,3], target[:,3])
+    overlap_y_min = torch.max(pred[:,1], target[:,1])
 
     overlap = abs((overlap_x_max - overlap_x_min).clamp(min = 0) * (overlap_y_max - overlap_y_min).clamp(min = 0))
     
-    entry_x_max = max(pred[:2], target[:2])
-    entry_x_min = min(pred[:0], target[:0])
-    entry_y_max = max(pred[:3], target[:3])
-    entry_y_min = min(pred[:1], target[:1])
+    entry_x_max = torch.max(pred[:,2], target[:,2])
+    entry_x_min = torch.min(pred[:,0], target[:,0])
+    entry_y_max = torch.max(pred[:,3], target[:,3])
+    entry_y_min = torch.min(pred[:,1], target[:,1])
 
     entry = abs((entry_y_max - entry_y_min) * (entry_x_max - entry_x_min))
 

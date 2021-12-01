@@ -186,6 +186,39 @@ def convert_to_coco_valid(json_path, classes, coco_dict):
     with open(os.path.join(CUR_PATH, 'valid.json'), 'w', encoding='utf-8') as jfile:
         json.dump(coco_dict, jfile)
 
+def convert_to_coco_test(img_paths, classes, coco_dict):
+    img = []
+    annotations = []
+    categories = []
+
+    img_idx = 0
+    anno_idx = 0
+    cat_idx = 0
+
+    for c in classes:
+        categories.append({'id':cat_idx, 'name':c, 'super_category':None})
+        cat_idx += 1
+    
+    for img_path in img_paths:
+        file_name = img_path.split('/')[-1]
+        img.append({'id':img_idx, 'file_name': file_name, 'height':2100, 'width':2800})
+    
+    for _ in range(len(img_paths)):
+        label,x,y,w,h = 0, 0, 0, 1, 1
+        annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h),\
+            'area':w*h, 'iscrowd':0, 'ignore':0, 'segmentation': []})
+
+        anno_idx += 1
+    img_idx += 1
+
+    coco_dict['images'] = img
+    coco_dict['annotations'] = annotations
+    coco_dict['categories'] = categories
+
+    CUR_PATH = os.getcwd()
+    with open(os.path.join(CUR_PATH, 'test.json'), 'w', encoding='utf-8') as jfile:
+        json.dump(coco_dict, jfile)
+
 if __name__ == '__main__':
     coco_dict = dict(
         info= dict(

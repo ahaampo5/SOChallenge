@@ -105,6 +105,8 @@ coco_dict = dict(
 def convert_to_coco_train(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
 
+    train_indices = map(lambda x:str(x), range(17173)[17173//5:])
+
     img = []
     annotations = []
     categories = []
@@ -118,18 +120,20 @@ def convert_to_coco_train(json_path, classes, coco_dict):
         cat_idx += 1
 
     with open(json_path, 'r') as jfile:
+        
         json_data = json.load(jfile) # dict
 
         for key in json_data:
-            img.append({'id':img_idx, 'file_name': key, 'height':2100, 'width':2800})
-        
-            for label, x, y, w, h in json_data[key]:
-                label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
-                annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
-                                'ignore':0, 'segmentation': []})
-                classes_count[int(label)] += 1
-                anno_idx += 1
-            img_idx += 1
+            if key.split('.')[0] in train_indices:
+                img.append({'id':img_idx, 'file_name': key, 'height':2100, 'width':2800})
+            
+                for label, x, y, w, h in json_data[key]:
+                    label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
+                    annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
+                                    'ignore':0, 'segmentation': []})
+                    classes_count[int(label)] += 1
+                    anno_idx += 1
+                img_idx += 1
             
     coco_dict['images'] = img
     coco_dict['annotations'] = annotations
@@ -169,6 +173,7 @@ def convert_to_coco_valid(json_path, classes, coco_dict):
                     label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
                     annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h),\
                         'area':w*h, 'iscrowd':0, 'ignore':0, 'segmentation': []})
+
                     classes_count[int(label)] += 1
                     anno_idx += 1
                 img_idx += 1
@@ -180,7 +185,6 @@ def convert_to_coco_valid(json_path, classes, coco_dict):
     CUR_PATH = os.getcwd()
     with open(os.path.join(CUR_PATH, 'valid.json'), 'w', encoding='utf-8') as jfile:
         json.dump(coco_dict, jfile)
-
 
 if __name__ == '__main__':
     coco_dict = dict(

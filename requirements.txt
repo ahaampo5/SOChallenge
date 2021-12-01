@@ -1,30 +1,40 @@
 cython
 numpy
+<<<<<<< HEAD
 
 recommonmark
 sphinx
 sphinx_markdown_tables
 sphinx_rtd_theme
 
+=======
+>>>>>>> 8e8b0258373baf9d9a76420023d861cd450cd7e4
 albumentations>=0.3.2
 cityscapesscripts
 imagecorruptions
 mmlvis
 scipy
 sklearn
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8e8b0258373baf9d9a76420023d861cd450cd7e4
 matplotlib
 mmpycocotools
 numpy
 six
 terminaltables
 timm
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8e8b0258373baf9d9a76420023d861cd450cd7e4
 asynctest
 codecov
 flake8
 interrogate
 isort==4.3.21
+<<<<<<< HEAD
 # Note: used for kwarray.group_items, this may be ported to mmcv in the future.
 kwarray
 onnx==1.7.0
@@ -37,3 +47,5 @@ yapf
 # torch==1.8.2+cu102 torchvision==0.9.2+cu102 torchaudio==0.8.2 -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
 # mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.8.2/index.html
 # pip install mmdet
+=======
+>>>>>>> 8e8b0258373baf9d9a76420023d861cd450cd7e4

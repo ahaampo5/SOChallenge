@@ -3,6 +3,7 @@ import json
 from argparse import ArgumentParser
 import torch
 from torch.utils.data import DataLoader
+import glob
 
 # baseline model
 from src.model import BASELINE_MODEL
@@ -118,7 +119,7 @@ def get_args():
     parser.add_argument("--batch-size", type=int, default=8, help="number of samples for each iteration")
     parser.add_argument("--lr", type=float, default=0.001, help="initial learning rate")
     parser.add_argument("--nms-threshold", type=float, default=0.5)
-    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--num-workers", type=int, default=4)
 
     # DONOTCHANGE: They are reserved for nsml
     parser.add_argument("--pause", type=int, default=0)
@@ -159,7 +160,7 @@ def main(opt):
     cfg.data.samples_per_gpu = opt.batch_size
     cfg.data.workers_per_gpu = 4
 
-    cfg.seed = 9
+    cfg.seed = 42
     cfg.gpu_ids = [0]
     cfg.work_dir = WORK_DIR
     cfg.runner.max_epochs = 10
@@ -172,7 +173,7 @@ def main(opt):
         warmup='linear', # The warmup policy, also support `exp` and `constant`.
         warmup_iters=500, # The number of iterations for warmup
         warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
-        min_lr=1e-08)
+        min_lr=1e-04)
 
     cfg.log_config.interval = 600
     cfg.checkpoint_config.interval = 1

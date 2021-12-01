@@ -162,9 +162,9 @@ def main(opt):
     cfg.seed = 9
     cfg.gpu_ids = [0]
     cfg.work_dir = WORK_DIR
-    cfg.runner.max_epochs = 5
-    cfg.rtotal_epochs = 1
-    cfg.optimizer.lr = opt.lr
+    cfg.runner.max_epochs = 10
+    cfg.rtotal_epochs = 10
+    cfg.optimizer = dict(type='Adam', lr=opt.lr, weight_decay=0.0001)
 
     cfg.lr_config = dict(
         policy='CosineAnnealing', # The policy of scheduler, also support CosineAnnealing, Cyclic, etc. Refer to details of supported LrUpdater from https://github.com/open-mmlab/mmcv/blob/master/mmcv/runner/hooks/lr_updater.py#L9.

@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 import pickle
 from tqdm import tqdm
+from collections import defaultdict
 
 def collate_fn(batch):
     items = list(zip(*batch))
@@ -103,6 +104,8 @@ coco_dict = dict(
 
 def convert_to_coco_train(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
+
+    area_count = defaultdict()
 
     img = []
     annotations = []

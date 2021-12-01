@@ -8,23 +8,11 @@ from torch.utils.data import DataLoader
 from src.model import BASELINE_MODEL
 from src.utils import train, generate_dboxes, Encoder, BaseTransform
 from src.loss import Loss
-from src.dataset import collate_fn, Small_dataset, prepocessing,\
-    coco_dict, convert_to_coco_train, convert_to_coco_valid
+from src.dataset import collate_fn, Small_dataset, prepocessing
 
 # nsml
 import nsml
 from nsml import DATASET_PATH
-
-import sys
-from mmcv import Config
-from mmcv.runner import load_checkpoint
-from mmdet.datasets import build_dataset
-from mmdet.models import build_detector
-from mmdet.apis import train_detector, set_random_seed, init_detector
-from mmdet.datasets import build_dataloader, build_dataset, replace_ImageToTensor
-from mmdet.utils import collect_env, get_root_logger
-
-
 
 # only infer
 def test_preprocessing(img, transform=None):
@@ -128,67 +116,51 @@ def get_args():
     return args
 
 def main(opt):
+    
+    torch.manual_seed(123)
+    num_class = 30 # 순수한 데이터셋 클래스 개수
 
-    classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
-            '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
-            
-    convert_to_coco_train(os.path.join(DATASET_PATH, 'train', 'train_label'),
-            classes, coco_dict
-    )
-    convert_to_coco_valid(os.path.join(DATASET_PATH, 'train', 'train_label'),
-            classes, coco_dict
-    )
+    # baseline model
+    dboxes = generate_dboxes()
+    model = BASELINE_MODEL(num_classes=num_class+1) # 배경 class 포함 모델
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.937, 0.999))
+    scheduler = None
 
-    CUR_PATH = os.getcwd()
-    CFG_PATH = os.path.join("/app/configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
-    PREFIX = os.path.join(DATASET_PATH, 'train', 'train_data')
-    WORK_DIR = os.path.join('/app/work_dir')
+    bind_model(model)
 
-    # config file 들고오기
-    cfg = Config.fromfile(CFG_PATH)
+    if opt.pause:
+        nsml.paused(scope=locals())
+    else:
+        # loss
+        criterion = Loss(dboxes)
 
-    cfg.data.train.classes = classes
-    cfg.data.train.img_prefix = PREFIX
-    cfg.data.train.ann_file = CUR_PATH + "/all_train.json"
+        # train data
+        with open(os.path.join(DATASET_PATH, 'train', 'train_label'), 'r', encoding="utf-8") as f:
+            train_data_dict = json.load(f)
+            train_img_label = prepocessing(root_dir=os.path.join(DATASET_PATH, 'train', 'train_data'),\
+                label_data=train_data_dict, input_size=(300,300))
+        
+        train_params = {"batch_size": opt.batch_size,
+                        "shuffle": True,
+                        "drop_last": False,
+                        "num_workers": opt.num_workers,
+                        "collate_fn": collate_fn}
 
-    cfg.data.val.classes = classes
-    cfg.data.val.img_prefix = PREFIX
-    cfg.data.val.ann_file = CUR_PATH + "/valid.json"
+        # data loader
+        train_data = Small_dataset(train_img_label, num_class, BaseTransform(dboxes))
+        train_loader = DataLoader(train_data, **train_params)
 
-    # data
-    cfg.data.samples_per_gpu = opt.batch_size
-    cfg.data.workers_per_gpu = 4
+        model.cuda()
+        criterion.cuda()
 
-    cfg.seed = 9
-    cfg.gpu_ids = [0]
-    cfg.work_dir = WORK_DIR
-    cfg.runner.max_epochs = 5
-    cfg.rtotal_epochs = 1
-    cfg.optimizer.lr = opt.lr
-
-    cfg.lr_config = dict(
-        policy='CosineAnnealing', # The policy of scheduler, also support CosineAnnealing, Cyclic, etc. Refer to details of supported LrUpdater from https://github.com/open-mmlab/mmcv/blob/master/mmcv/runner/hooks/lr_updater.py#L9.
-        by_epoch=False,
-        warmup='linear', # The warmup policy, also support `exp` and `constant`.
-        warmup_iters=500, # The number of iterations for warmup
-        warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
-        min_lr=1e-08)
-
-    cfg.log_config.interval = 600
-    cfg.checkpoint_config.interval = 1
-    cfg.log_config = {'hooks': [{'type': 'TextLoggerHook'}], 'interval': 600}
-    # cfg.fp16 = dict(loss_scale=512.)
-    cfg.model.pretrained = None
-
-    model = build_detector(cfg.model)
-    datasets = [build_dataset(cfg.data.train)]
-    model.CLASSES = datasets[0].CLASSES
-
-    bind_model(model)    
-
-    train_detector(model, datasets[0], cfg, distributed=False, validate=True)
-
-    nsml.save(0)
+        for epoch in range(0, opt.epochs):
+            train_loss = train(model, train_loader, epoch, criterion, optimizer, scheduler)
+            nsml.report(
+                epoch=epoch,
+                epoch_total=opt.epochs,
+                batch_size=opt.batch_size,
+                train_loss=train_loss)
+            nsml.save(epoch)
 
 if __name__ == "__main__":
     opt = get_args()

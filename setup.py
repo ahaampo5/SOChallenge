@@ -1,4 +1,4 @@
-#nsml: killonexx/mmdetection:latest
+#nsml: vvvic313/soc:latest
 
 from distutils.core import setup
 

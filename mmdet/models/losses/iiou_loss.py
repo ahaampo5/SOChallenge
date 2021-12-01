@@ -37,60 +37,22 @@ def iiou(pred, target):
 
 @LOSSES.register_module()
 class IIoULoss(nn.Module):
-    """IoULoss.
+    """IIoULoss.
 
-    Computing the IoU loss between a set of predicted bboxes and target bboxes.
+    Computing the IIoU loss between a set of predicted bboxes and target bboxes.
 
-    Args:
-        linear (bool): If True, use linear scale of loss instead of log scale.
-            Default: False.
-        eps (float): Eps to avoid log(0).
-        reduction (str): Options are "none", "mean" and "sum".
-        loss_weight (float): Weight of loss.
     """
 
-    def __init__(self,
-                 linear=False,
-                 eps=1e-6,
-                 reduction='mean',
-                 loss_weight=1.0):
+    def __init__(self):
         super(IIoULoss, self).__init__()
-        self.linear = linear
-        self.eps = eps
-        self.reduction = reduction
-        self.loss_weight = loss_weight
-
-    def forward(self,
-                pred,
-                target,
-                weight=None,
-                avg_factor=None,
-                reduction_override=None,
-                **kwargs):
+        
+    def forward(self, pred, target):
         """Forward function.
 
         Args:
             pred (torch.Tensor): The prediction.
             target (torch.Tensor): The learning target of the prediction.
-            weight (torch.Tensor, optional): The weight of loss for each
-                prediction. Defaults to None.
-            avg_factor (int, optional): Average factor that is used to average
-                the loss. Defaults to None.
-            reduction_override (str, optional): The reduction method used to
-                override the original reduction method of the loss.
-                Defaults to None. Options are "none", "mean" and "sum".
+    
         """
-        assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
-        if (weight is not None) and (not torch.any(weight > 0)) and (
-                reduction != 'none'):
-            return (pred * weight).sum()  # 0
-        if weight is not None and weight.dim() > 1:
-            # TODO: remove this in the future
-            # reduce the weight of shape (n, 4) to (n,) to match the
-            # iou_loss of shape (n,)
-            assert weight.shape == pred.shape
-            weight = weight.mean(-1)
         loss = 1 - iiou(pred, target)
         return loss

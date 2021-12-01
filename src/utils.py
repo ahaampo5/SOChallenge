@@ -7,12 +7,15 @@ import torch
 import torch.nn.functional as F
 
 # class ==========================
-def train(model, train_loader, epoch, optimizer, scheduler):
+def train(model, train_loader, epoch, optimizer, scheduler, gpu):
+    print(f'epoch : [{epoch}]')
     model.train()
     progress_bar = tqdm(train_loader)
-    for i, (img, _, _, targets) in enumerate(progress_bar):
-        img = img.cuda()
-        targets = [{k: v.cuda() for k, v in t.items()} for t in targets]
+    for i, (img, targets) in enumerate(progress_bar):
+        if i==1:
+            break
+        img = list(image.float().cuda(gpu) for image in img)
+        targets = [{k: v.cuda(gpu) for k, v in t.items()} for t in targets]
 
         optimizer.zero_grad()
 

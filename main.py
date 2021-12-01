@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 # baseline model
 from src.model import build_model
 from src.utils import train
-from src.dataset import collate_fn, Small_dataset
+from src.dataset import collate_fn, Small_dataset, prepocessing
 
 # albumentation
 import cv2
@@ -17,6 +17,10 @@ from albumentations.pytorch.transforms import ToTensorV2
 # nsml
 import nsml
 from nsml import DATASET_PATH
+
+# multi-gpu
+import torch.distributed as dist
+from torch.utils.data.distributed import DistributedSampler
 
 # only infer
 def test_preprocessing(img, transform=None):
@@ -28,9 +32,7 @@ def test_preprocessing(img, transform=None):
 
 def bind_model(model):
     def save(dir_path, **kwargs):
-        checkpoint = {
-            "model": model.state_dict()}
-        torch.save(checkpoint, os.path.join(dir_path, 'model.pt'))
+        torch.save(model.module.state_dict(), os.path.join(dir_path, 'model.pt'))
         print("model saved!")
 
     def load(dir_path):
@@ -40,9 +42,9 @@ def bind_model(model):
 
     def get_test_transform():
         return A.Compose([
-        A.Resize(512,512),
-        ToTensorV2(p=1.0)
-    ])
+            A.Resize(512,512),
+            ToTensorV2(p=1.0)
+        ])
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
         '''
@@ -117,14 +119,22 @@ def get_train_transform():
         ToTensorV2(p=1.0)
     ], bbox_params={'format': 'pascal_voc', 'label_fields': ['labels']})
 
-def main(opt):
+def sub_main(opt):
+    n_gpus = torch.cuda.device_count()
+    torch.multiprocessing.spawn(main, nprocs=n_gpus, args=(opt, n_gpus, ))
+
+def main(gpu, opt, n_gpus):
+    opt.dist_url = "tcp://127.0.0.1:3333"
+    torch.cuda.empty_cache()
+    torch.distributed.init_process_group(backend='nccl', init_method=opt.dist_url, world_size=n_gpus, rank=gpu)
+
     torch.manual_seed(41)
     num_class = 30 # 순수한 데이터셋 클래스 개수
 
     # define model
     model = build_model(num_classes=num_class+1) # 배경 class 포함 모델
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
-    scheduler = None
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     bind_model(model)
 
@@ -137,20 +147,23 @@ def main(opt):
             train_img_label = prepocessing(root_dir=os.path.join(DATASET_PATH, 'train', 'train_data'),\
                 label_data=train_data_dict, input_size=(512,512))
         
+
+        train_data = Small_dataset(train_img_label, get_train_transform())
+        sampler = DistributedSampler(train_data)
+
         train_params = {"batch_size": opt.batch_size,
-                        "shuffle": True,
+                        "sampler": sampler,
                         "drop_last": False,
                         "num_workers": opt.num_workers,
                         "collate_fn": collate_fn}
 
-        # data loader
-        train_data = Small_dataset(train_img_label, num_class, get_train_transform())
         train_loader = DataLoader(train_data, **train_params)
 
-        model.cuda()
+        model.cuda(gpu)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
 
         for epoch in range(0, opt.epochs):
-            train_loss = train(model, train_loader, epoch, optimizer, scheduler)
+            train_loss = train(model, train_loader, epoch, optimizer, scheduler, gpu)
             nsml.report(
                 epoch=epoch,
                 epoch_total=opt.epochs,
@@ -160,4 +173,4 @@ def main(opt):
 
 if __name__ == "__main__":
     opt = get_args()
-    main(opt)
+    sub_main(opt)

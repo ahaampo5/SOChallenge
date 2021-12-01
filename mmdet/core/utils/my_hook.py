@@ -1,8 +1,6 @@
-from mmcv.runner import Hooks, Hook
-import os
-from ..dist_utils import master_only
-
+from mmcv.runner import Hooks, Hook, master_only
 import nsml
+
 @HOOKS.register_module()
 class MyHook(Hook):
 

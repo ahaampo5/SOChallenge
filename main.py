@@ -1,5 +1,6 @@
 import os
 import json
+import numpy as np
 from argparse import ArgumentParser
 import torch
 from torch.utils.data import DataLoader
@@ -22,11 +23,14 @@ from nsml import DATASET_PATH
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
+# wbf
+from ensemble_boxes import *
+
 # only infer
 def test_preprocessing(img, transform=None):
     # [참가자 TO-DO] inference를 위한 이미지 데이터 전처리
     if transform is not None:
-        img = transform(img)['image']
+        img = transform(image=img)['image']
         img = img.unsqueeze(0)
     return img
 
@@ -37,7 +41,7 @@ def bind_model(model):
 
     def load(dir_path):
         checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint)
         print('model loaded!')
 
     def get_test_transform():
@@ -45,6 +49,13 @@ def bind_model(model):
             A.Resize(512,512),
             ToTensorV2(p=1.0)
         ])
+
+    def run_wbf(pred, iou_thr=0.5, skip_box_thr=0.05, weights=None):
+        boxes = (pred['boxes']/512.).tolist()
+        scores = pred['scores'].tolist()
+        labels = pred['labels'].tolist()
+        boxes, scores, labels = weighted_boxes_fusion([boxes], [scores], [labels], weights=None, iou_thr=iou_thr, skip_box_thr=skip_box_thr)
+        return boxes, scores, labels
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
         '''
@@ -65,29 +76,26 @@ def bind_model(model):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
             img /= 255.0
 
-            width, height = img.size
+            width = img.shape[1]
+            height = img.shape[0]
 
             img = test_preprocessing(img, get_test_transform())
             img = img.cuda()
             detections = []
 
             with torch.no_grad():
-                pred = model(img)
-
-                boxes = pred['boxes'].float().detach().cpu()
-                scores = pred['score'].float().detach().cpu()
-                labels = pred['labels'].float().detach().cpu()
-
+                pred = model(img)[0]
+                boxes, scores, labels = run_wbf(pred, iou_thr=0.5, skip_box_thr=0.05)
+                
                 for box_, score_, label_ in zip(boxes, scores, labels):
-                    if scores_ > 0.5:
-                        detections.append([
-                            int(label_)-1,
-                            float( box_[0] * width ), 
-                            float( box_[1] * height ), 
-                            float( (box_[2] - box_[0]) * width ),
-                            float( (box_[3] - box_[1]) * height ), 
-                            float( score_ )
-                            ])
+                    detections.append([
+                        int(label_)-1,
+                        float( box_[0] * width ), 
+                        float( box_[1] * height ), 
+                        float( (box_[2] - box_[0]) * width ),
+                        float( (box_[3] - box_[1]) * height ), 
+                        float( score_ )
+                        ])
 
             result_dict[file_name] = detections # 반환 형식 준수해야 함
         return result_dict
@@ -136,9 +144,8 @@ def main(gpu, opt, n_gpus):
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
-    bind_model(model)
-
     if opt.pause:
+        bind_model(model)
         nsml.paused(scope=locals())
     else:
         # train data
@@ -161,6 +168,7 @@ def main(gpu, opt, n_gpus):
 
         model.cuda(gpu)
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
+        bind_model(model)
 
         for epoch in range(0, opt.epochs):
             train_loss = train(model, train_loader, epoch, optimizer, scheduler, gpu)

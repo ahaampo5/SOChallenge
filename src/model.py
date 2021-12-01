@@ -76,7 +76,7 @@ def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     return classification_loss, box_loss
 
 def build_model(num_classes=31):
-    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=False, pretrained_backbone=False)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.fastrcnn_loss = fastrcnn_loss
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)

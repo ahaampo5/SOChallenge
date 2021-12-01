@@ -12,8 +12,6 @@ def train(model, train_loader, epoch, optimizer, scheduler, gpu):
     model.train()
     progress_bar = tqdm(train_loader)
     for i, (img, targets) in enumerate(progress_bar):
-        if i==1:
-            break
         img = list(image.float().cuda(gpu) for image in img)
         targets = [{k: v.cuda(gpu) for k, v in t.items()} for t in targets]
 

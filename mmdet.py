@@ -3,6 +3,7 @@ import json
 from argparse import ArgumentParser
 import torch
 from torch.utils.data import DataLoader
+import glob
 
 # baseline model
 from src.model import BASELINE_MODEL
@@ -118,7 +119,7 @@ def get_args():
     parser.add_argument("--batch-size", type=int, default=8, help="number of samples for each iteration")
     parser.add_argument("--lr", type=float, default=0.001, help="initial learning rate")
     parser.add_argument("--nms-threshold", type=float, default=0.5)
-    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--num-workers", type=int, default=4)
 
     # DONOTCHANGE: They are reserved for nsml
     parser.add_argument("--pause", type=int, default=0)
@@ -140,7 +141,7 @@ def main(opt):
     )    
 
     CUR_PATH = os.getcwd()
-    CFG_PATH = os.path.join(CUR_PATH, "Swin-Transformer-Object-Detection/configs/swin/cascade_mask_rcnn_swin_tiny_patch4_window7_mstrain_480-800_giou_4conv1f_adamw_1x_coco.py")
+    CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
     PREFIX = os.path.join(DATASET_PATH, 'train', 'train_data')
     WORK_DIR = os.path.join(CUR_PATH, 'work_dir')
 
@@ -149,21 +150,21 @@ def main(opt):
 
     cfg.data.train.classes = classes
     cfg.data.train.img_prefix = PREFIX
-    cfg.data.train.ann_file = CUR_PATH + "all_train.json"
+    cfg.data.train.ann_file = CUR_PATH + "/all_train.json"
 
     cfg.data.val.classes = classes
     cfg.data.val.img_prefix = PREFIX
-    cfg.data.val.ann_file = CUR_PATH + "valid.json"
+    cfg.data.val.ann_file = CUR_PATH + "/valid.json"
 
     # data
     cfg.data.samples_per_gpu = opt.batch_size
-    cfg.data.workers_per_gpu = 0
+    cfg.data.workers_per_gpu = 4
 
-    cfg.seed = 9
+    cfg.seed = 42
     cfg.gpu_ids = [0]
     cfg.work_dir = WORK_DIR
-    cfg.runner.max_epochs = 1
-    cfg.rtotal_epochs = 1
+    cfg.runner.max_epochs = 10
+    cfg.rtotal_epochs = 10
     cfg.optimizer.lr = opt.lr
 
     cfg.lr_config = dict(
@@ -172,7 +173,7 @@ def main(opt):
         warmup='linear', # The warmup policy, also support `exp` and `constant`.
         warmup_iters=500, # The number of iterations for warmup
         warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
-        min_lr=1e-08)
+        min_lr=1e-04)
 
     cfg.log_config.interval = 600
     cfg.checkpoint_config.interval = 1

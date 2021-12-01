@@ -18,7 +18,7 @@ from nsml import DATASET_PATH
 
 import sys
 from mmcv import Config
-from mmcv.runner import load_checkpoint
+from mmcv.runner import load_checkpoint, get_dist_info, init_dist
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 from mmdet.apis import train_detector, set_random_seed, init_detector
@@ -162,6 +162,14 @@ def main(opt):
 
     cfg.seed = 42
     cfg.gpu_ids = [0]
+
+    distributed = True
+    if distributed == True:
+        init_dist('pytorch', **cfg.dist_params)
+        # re-set gpu_ids with distributed training mode
+        _, world_size = get_dist_info()
+        cfg.gpu_ids = range(world_size)
+
     cfg.work_dir = WORK_DIR
     cfg.runner.max_epochs = 10
     cfg.rtotal_epochs = 10
@@ -187,7 +195,7 @@ def main(opt):
 
     bind_model(model)    
 
-    train_detector(model, datasets[0], cfg, distributed=False, validate=True)
+    train_detector(model, datasets[0], cfg, distributed=distributed, validate=True)
 
     nsml.save(0)
 

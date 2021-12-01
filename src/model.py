@@ -93,12 +93,14 @@ def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     N, num_classes = class_logits.shape
     box_regression = box_regression.reshape(N, -1, 4)
 
-    box_loss = det_utils.smooth_l1_loss(
-        box_regression[sampled_pos_inds_subset, labels_pos],
-        regression_targets[sampled_pos_inds_subset],
-        beta=1 / 9,
-        size_average=False,
-    )
+    # box_loss = det_utils.smooth_l1_loss(
+    #     box_regression[sampled_pos_inds_subset, labels_pos],
+    #     regression_targets[sampled_pos_inds_subset],
+    #     beta=1 / 9,
+    #     size_average=False,
+    # )
+    loss = IIoULoss()
+    box_loss = loss(box_regression[sampled_pos_inds_subset, labels_pos], regression_targets[sampled_pos_inds_subset])
     box_loss = box_loss / labels.numel()
 
     return classification_loss, box_loss

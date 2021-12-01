@@ -64,7 +64,7 @@ class IIoULoss(nn.Module):
         iou = overlap / (S_p + S - overlap)
         iiou = iou - (entry - (S_p + S - overlap)) / entry
 
-        return iiou
+        return 1 - iiou
 
 def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]

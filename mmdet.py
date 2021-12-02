@@ -18,6 +18,7 @@ from nsml import DATASET_PATH
 
 import sys
 import mmcv
+import time
 from mmcv import Config
 from mmcv.runner import load_checkpoint
 from mmdet.datasets import build_dataset
@@ -48,13 +49,14 @@ def bind_model(model):
             'state_dict': weights_to_cpu(get_state_dict(model))
         }
         torch.save(checkpoint, os.path.join(dir_path, 'model.pt'))
+        # torch.save(checkpoint, '/app/model.pt')
         print("model saved!")
 
     def load(dir_path):
         # checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
         # model.load_state_dict(checkpoint["model"])
         checkpoint_path = os.path.join(dir_path, 'model.pt')
-        checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
+        load_checkpoint(model, checkpoint_path, map_location='cpu')
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
@@ -84,7 +86,7 @@ def bind_model(model):
 
         convert_to_coco_test(test_img_path_list, classes, coco_dict)
 
-        work_dir = os.dirname(test_img_path_list[0])
+        dir_name = os.path.dirname(test_img_path_list[0])
         CUR_PATH = os.getcwd()
         CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
         
@@ -92,13 +94,14 @@ def bind_model(model):
         
         cfg.data.test.classes = classes
         cfg.data.test.img_prefix = dir_name
-        cfg.data.test.ann_file = CUR_PATH + 'test.json'
+        cfg.data.test.ann_file = CUR_PATH + '/test.json'
         cfg.data.samples_per_gpu = 4
 
         cfg.seed=2020
         cfg.gpu_ids = [0]
         
         cfg.model.train_cfg = None
+        cfg.model.pretrained = None
         dataset = build_dataset(cfg.data.test)
 
         data_loader = build_dataloader(
@@ -107,30 +110,28 @@ def bind_model(model):
                 workers_per_gpu=cfg.data.workers_per_gpu,
                 dist=False,
                 shuffle=False)
-
-        model.CLASSES = datasets.CLASSES
-        model = MMDataParallel(model.cuda(), device_ids=[0])
+        model.CLASSES = dataset.CLASSES
+        net = MMDataParallel(model.cuda(), device_ids=[0])
         class_num = 30
-        output = single_gpu_test(model, data_loader, show_score_thr=0.05)
+        output = single_gpu_test(net, data_loader, show_score_thr=0.05)
 
         result_dict = {}
-        for out in zip(output, test_img_path_list):
-            file_name = test_img_path_list.split('/')[-1]
+        for out, img in zip(output, test_img_path_list):
+            file_name = img.split('/')[-1]
             detections = []
             for j in range(class_num):
                 for o in out[j]:
                     detections.append([
-                        o[j],
-                        o[0],
-                        o[1],
-                        o[2]-o[0],
-                        o[3]-o[1],
-                        o[4]
+                        j,
+                        float(o[0]),
+                        float(o[1]),
+                        float(o[2]-o[0]),
+                        float(o[3]-o[1]),
+                        float(o[4])
                     ])
             result_dict[file_name] = detections
         return result_dict
 
-        
 
         return result_dict
 
@@ -155,66 +156,75 @@ def get_args():
 
 def main(opt):
     
-
     classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
-            
-    convert_to_coco_train(os.path.join(DATASET_PATH, 'train', 'train_label'),
-            classes, coco_dict
-    )
-    convert_to_coco_valid(os.path.join(DATASET_PATH, 'train', 'train_label'),
-            classes, coco_dict
-    )    
+    if not opt.pause:    
+        convert_to_coco_train(os.path.join(DATASET_PATH, 'train', 'train_label'),
+                classes, coco_dict
+        )
+        convert_to_coco_valid(os.path.join(DATASET_PATH, 'train', 'train_label'),
+                classes, coco_dict
+        )    
 
-    CUR_PATH = os.getcwd()
-    CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
-    PREFIX = os.path.join(DATASET_PATH, 'train', 'train_data')
-    WORK_DIR = os.path.join(CUR_PATH, 'work_dir')
+        CUR_PATH = os.getcwd()
+        CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
+        PREFIX = os.path.join(DATASET_PATH, 'train', 'train_data')
+        WORK_DIR = os.path.join(CUR_PATH, 'work_dir')
 
-    # config file 들고오기
-    cfg = Config.fromfile(CFG_PATH)
+        # config file 들고오기
+        cfg = Config.fromfile(CFG_PATH)
 
-    cfg.data.train.classes = classes
-    cfg.data.train.img_prefix = PREFIX
-    cfg.data.train.ann_file = CUR_PATH + "/all_train.json"
+        cfg.data.train.classes = classes
+        cfg.data.train.img_prefix = PREFIX
+        cfg.data.train.ann_file = CUR_PATH + "/all_train.json"
 
-    cfg.data.val.classes = classes
-    cfg.data.val.img_prefix = PREFIX
-    cfg.data.val.ann_file = CUR_PATH + "/valid.json"
+        cfg.data.val.classes = classes
+        cfg.data.val.img_prefix = PREFIX
+        cfg.data.val.ann_file = CUR_PATH + "/valid.json"
 
-    # data
-    cfg.data.samples_per_gpu = opt.batch_size
-    cfg.data.workers_per_gpu = 4
+        # data
+        cfg.data.samples_per_gpu = opt.batch_size
+        cfg.data.workers_per_gpu = 4
 
-    cfg.optimizer = dict(type='Adam', lr=1e-4, weight_decay=1e-5)
+        cfg.optimizer = dict(type='Adam', lr=1e-4, weight_decay=1e-5)
 
-    cfg.seed = 42
-    cfg.gpu_ids = [0]
-    cfg.work_dir = WORK_DIR
-    cfg.runner.max_epochs = 1
-    cfg.rtotal_epochs = 1
-    cfg.optimizer.lr = opt.lr
+        cfg.seed = 42
+        cfg.gpu_ids = [0]
+        cfg.work_dir = WORK_DIR
+        cfg.runner.max_epochs = 2
+        cfg.rtotal_epochs = 2
+        cfg.optimizer.lr = opt.lr
 
-    cfg.lr_config = dict(
-        policy='CosineAnnealing', # The policy of scheduler, also support CosineAnnealing, Cyclic, etc. Refer to details of supported LrUpdater from https://github.com/open-mmlab/mmcv/blob/master/mmcv/runner/hooks/lr_updater.py#L9.
-        by_epoch=False,
-        warmup='linear', # The warmup policy, also support `exp` and `constant`.
-        warmup_iters=500, # The number of iterations for warmup
-        warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
-        min_lr=1e-07)
+        cfg.lr_config = dict(
+            policy='CosineAnnealing', # The policy of scheduler, also support CosineAnnealing, Cyclic, etc. Refer to details of supported LrUpdater from https://github.com/open-mmlab/mmcv/blob/master/mmcv/runner/hooks/lr_updater.py#L9.
+            by_epoch=False,
+            warmup='linear', # The warmup policy, also support `exp` and `constant`.
+            warmup_iters=500, # The number of iterations for warmup
+            warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
+            min_lr=1e-07)
 
-    cfg.log_config.interval = 600
-    cfg.checkpoint_config.interval = 1
-    cfg.log_config = {'hooks': [{'type': 'TextLoggerHook'}], 'interval': 600}
-    cfg.model.pretrained = None
+        cfg.log_config.interval = 600
+        cfg.checkpoint_config.interval = 1
+        cfg.log_config = {'hooks': [{'type': 'TextLoggerHook'}], 'interval': 600}
+        cfg.model.pretrained = None
+        model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
+        datasets = [build_dataset(cfg.data.train)]
+        model.CLASSES = datasets[0].CLASSES
 
-    model = build_detector(cfg.model)
-    datasets = [build_dataset(cfg.data.train)]
-    model.CLASSES = datasets[0].CLASSES
+        bind_model(model)    
+    else:
+        CFG_PATH = os.path.join("/app/configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
+        
+        cfg = Config.fromfile(CFG_PATH)
+        cfg.model.pretrained = None
+        model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
 
-    bind_model(model)    
-
-    train_detector(model, datasets[0], cfg, distributed=False, validate=True)
+        bind_model(model)
+    if opt.pause:
+        nsml.paused(scope=locals())
+    else:
+        train_detector(model, datasets[0], cfg, distributed=False, validate=True)
+        nsml.save(0)
 
 
 if __name__ == "__main__":

@@ -5,8 +5,8 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=[(1440, 800),(1024, 1024), (800, 800)], 
-        multiscale_mode='value', keep_ratio=True),
+    dict(type='Resize', img_scale=(1333, 768) ,
+        multiscale_mode='range', keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(
         type='AutoAugment',
@@ -17,18 +17,7 @@ train_pipeline = [
         ],
         [
             dict(type='ColorTransform', level=3),
-            dict(type='EqualizeTransform'),
             dict(type='BrightnessTransform', level=4),
-            dict(type='ContrastTransform', level=4)
-        ],
-        [
-            dict(type='Shear', level=4),
-            dict(type='Rotate', level=6),
-            dict(type='Translate', level=8),
-            dict(type='ColorTransform', level=5),
-            dict(type='EqualizeTransform'),
-            dict(type='BrightnessTransform', level=3),
-            dict(type='ContrastTransform', level=4)
         ],
         ]
     ),
@@ -42,7 +31,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=[(1440, 1440), (1024, 1024), (768, 768)],
+        img_scale=[(1440, 1440), (768, 768)],
         flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),

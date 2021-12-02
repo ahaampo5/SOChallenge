@@ -64,7 +64,6 @@ def bind_model(model):
         반환 형식 준수해야 정상적으로 score가 기록됩니다.
         {'file_name':[[cls_num, x, y, w, h, conf]]}
         '''
-        result_dict = {}
 
         # for baseline model ==============================
         import mmcv
@@ -106,34 +105,48 @@ def bind_model(model):
 
         data_loader = build_dataloader(
                 dataset,
-                samples_per_gpu=4,
+                samples_per_gpu=1,
                 workers_per_gpu=cfg.data.workers_per_gpu,
                 dist=False,
                 shuffle=False)
         model.CLASSES = dataset.CLASSES
         net = MMDataParallel(model.cuda(), device_ids=[0])
+
+        # output = single_gpu_test(net, data_loader, show_score_thr=0.05)
         class_num = 30
-        output = single_gpu_test(net, data_loader, show_score_thr=0.05)
 
         result_dict = {}
-        for out, img in zip(output, test_img_path_list):
+        for test_img in test_img_path_list:
+            file_name = test_img.split('/')[-1]
+            result_dict[file_name] = []
+
+        net.eval()
+        if (len(data_loader) != len(test_img_path_list)):
+            raise NotImplementedError()
+
+        for data, img in zip(data_loader, test_img_path_list):
+            with torch.no_grad():
+                result = net(return_loss=False, rescale=True, **data)
             file_name = img.split('/')[-1]
             detections = []
-            for j in range(class_num):
-                for o in out[j]:
-                    detections.append([
-                        j,
-                        float(o[0]),
-                        float(o[1]),
-                        float(o[2]-o[0]),
-                        float(o[3]-o[1]),
-                        float(o[4])
-                    ])
+            try:
+                for j in range(class_num):
+                    for o in result[j]:
+                        detections.append([
+                            j,
+                            float(o[0]),
+                            float(o[1]),
+                            float(o[2]-o[0]),
+                            float(o[3]-o[1]),
+                            float(o[4])
+                        ])
+            except:
+                result_dict[file_name] = []
+                pass
             result_dict[file_name] = detections
+            
         return result_dict
 
-
-        return result_dict
 
     # DONOTCHANGE: They are reserved for nsml
     nsml.bind(save=save, load=load, infer=infer)
@@ -141,7 +154,7 @@ def bind_model(model):
 def get_args():
     parser = ArgumentParser(description="NSML BASELINE")
     parser.add_argument("--epochs", type=int, default=10, help="number of total epochs to run")
-    parser.add_argument("--batch-size", type=int, default=8, help="number of samples for each iteration")
+    parser.add_argument("--batch-size", type=int, default=10, help="number of samples for each iteration")
     parser.add_argument("--lr", type=float, default=0.001, help="initial learning rate")
     parser.add_argument("--nms-threshold", type=float, default=0.5)
     parser.add_argument("--num-workers", type=int, default=4)
@@ -191,8 +204,8 @@ def main(opt):
         cfg.seed = 42
         cfg.gpu_ids = [0]
         cfg.work_dir = WORK_DIR
-        cfg.runner.max_epochs = 2
-        cfg.rtotal_epochs = 2
+        cfg.runner.max_epochs = 0
+        cfg.rtotal_epochs = 0
         cfg.optimizer.lr = opt.lr
 
         cfg.lr_config = dict(

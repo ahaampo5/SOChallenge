@@ -7,16 +7,17 @@ import glob
 
 # baseline model
 from src.model import BASELINE_MODEL
-from src.utils import train, generate_dboxes, Encoder, BaseTransform
+from src.utils import train, generate_dboxes, Encoder, BaseTransform, weights_to_cpu, get_state_dict
 from src.loss import Loss
 from src.dataset import collate_fn, Small_dataset, prepocessing,\
-    coco_dict, convert_to_coco_train, convert_to_coco_valid
+    coco_dict, convert_to_coco_train, convert_to_coco_valid, convert_to_coco_test
 
 # nsml
 import nsml
 from nsml import DATASET_PATH
 
 import sys
+import mmcv
 from mmcv import Config
 from mmcv.runner import load_checkpoint
 from mmdet.datasets import build_dataset
@@ -25,7 +26,7 @@ from mmdet.apis import train_detector, set_random_seed, init_detector
 from mmdet.datasets import build_dataloader, build_dataset, replace_ImageToTensor
 from mmdet.utils import collect_env, get_root_logger
 
-
+from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 
 # only infer
 def test_preprocessing(img, transform=None):
@@ -37,14 +38,23 @@ def test_preprocessing(img, transform=None):
 
 def bind_model(model):
     def save(dir_path, **kwargs):
+        meta = {}
+        meta.update(mmcv_version=mmcv.__version__, time=time.asctime())
+        if hasattr(model, 'CLASSES') and model.CLASSES is not None:
+            # save class name to the meta
+            meta.update(CLASSES=model.CLASSES)
         checkpoint = {
-            "model": model.state_dict()}
+            'meta': meta,
+            'state_dict': weights_to_cpu(get_state_dict(model))
+        }
         torch.save(checkpoint, os.path.join(dir_path, 'model.pt'))
         print("model saved!")
 
     def load(dir_path):
-        checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
-        model.load_state_dict(checkpoint["model"])
+        # checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
+        # model.load_state_dict(checkpoint["model"])
+        checkpoint_path = os.path.join(dir_path, 'model.pt')
+        checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
@@ -55,59 +65,73 @@ def bind_model(model):
         result_dict = {}
 
         # for baseline model ==============================
-        import torchvision.transforms as transforms
-        from PIL import Image
-        from tqdm import tqdm
+        import mmcv
+        from mmcv import Config
+        from mmdet.datasets import (build_dataloader, build_dataset,
+                                    replace_ImageToTensor)
+        from mmdet.models import build_detector
+        from mmdet.apis import single_gpu_test
+        from mmcv.runner import load_checkpoint
+        import os
+        from mmcv.parallel import MMDataParallel
+        import pandas as pd
+        from pandas import DataFrame
+        from pycocotools.coco import COCO
+        import numpy as np
 
-        infer_transforms = transforms.Compose([
-                transforms.Resize((300,300)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.5], std=[0.5])
-            ])
-        dboxes = generate_dboxes() 
-        encoder = Encoder(dboxes) # inference시 박스 좌표로 후처리하는 모듈
+        classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
+            '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
 
-        model.cuda()
-        model.eval()
+        convert_to_coco_test(test_img_path_list, classes, coco_dict)
 
-        for _, file_path in enumerate(tqdm(test_img_path_list)):
-            file_name = file_path.split("/")[-1]
-            img = Image.open(file_path)
-            width, height = img.size
+        work_dir = os.dirname(test_img_path_list[0])
+        CUR_PATH = os.getcwd()
+        CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
+        
+        cfg = Config.fromfile(CFG_PATH)
+        
+        cfg.data.test.classes = classes
+        cfg.data.test.img_prefix = dir_name
+        cfg.data.test.ann_file = CUR_PATH + 'test.json'
+        cfg.data.samples_per_gpu = 4
 
-            img = test_preprocessing(img, infer_transforms)
-            img = img.cuda()
+        cfg.seed=2020
+        cfg.gpu_ids = [0]
+        
+        cfg.model.train_cfg = None
+        dataset = build_dataset(cfg.data.test)
+
+        data_loader = build_dataloader(
+                dataset,
+                samples_per_gpu=4,
+                workers_per_gpu=cfg.data.workers_per_gpu,
+                dist=False,
+                shuffle=False)
+
+        model.CLASSES = datasets.CLASSES
+        model = MMDataParallel(model.cuda(), device_ids=[0])
+        class_num = 30
+        output = single_gpu_test(model, data_loader, show_score_thr=0.05)
+
+        result_dict = {}
+        for out in zip(output, test_img_path_list):
+            file_name = test_img_path_list.split('/')[-1]
             detections = []
+            for j in range(class_num):
+                for o in out[j]:
+                    detections.append([
+                        o[j],
+                        o[0],
+                        o[1],
+                        o[2]-o[0],
+                        o[3]-o[1],
+                        o[4]
+                    ])
+            result_dict[file_name] = detections
+        return result_dict
 
-            with torch.no_grad():
-                ploc, plabel = model(img)
-                ploc, plabel = ploc.float().detach().cpu(), plabel.float().detach().cpu()
+        
 
-                try:
-                    result = encoder.decode_batch(ploc, plabel, 0.5, 100)[0]
-                except:
-                    print("No object detected : ", file_name)
-                    continue
-
-                loc, label, prob = [r.numpy() for r in result]
-                for loc_, label_, prob_ in zip(loc, label, prob):
-                    try:
-                        '''
-                        결과 기록 형식, 데이터 타입 준수해야 함
-                        pred_cls, x, y, w, h, confidence
-                        '''
-                        detections.append([
-                            int(label_)-1,
-                            float( loc_[0] * width ), 
-                            float( loc_[1] * height ), 
-                            float( (loc_[2] - loc_[0]) * width ),
-                            float( (loc_[3] - loc_[1]) * height ), 
-                            float( prob_ )
-                            ])
-                    except:
-                        continue
-
-            result_dict[file_name] = detections # 반환 형식 준수해야 함
         return result_dict
 
     # DONOTCHANGE: They are reserved for nsml
@@ -128,7 +152,9 @@ def get_args():
     args = parser.parse_args()
     return args
 
+
 def main(opt):
+    
 
     classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
@@ -141,7 +167,7 @@ def main(opt):
     )    
 
     CUR_PATH = os.getcwd()
-    CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
+    CFG_PATH = os.path.join(CUR_PATH, "configs/cascade_rcnn/cascade_rcnn_r50_fpn_1x_coco.py")
     PREFIX = os.path.join(DATASET_PATH, 'train', 'train_data')
     WORK_DIR = os.path.join(CUR_PATH, 'work_dir')
 
@@ -160,11 +186,13 @@ def main(opt):
     cfg.data.samples_per_gpu = opt.batch_size
     cfg.data.workers_per_gpu = 4
 
+    cfg.optimizer = dict(type='Adam', lr=1e-4, weight_decay=1e-5)
+
     cfg.seed = 42
     cfg.gpu_ids = [0]
     cfg.work_dir = WORK_DIR
-    cfg.runner.max_epochs = 10
-    cfg.rtotal_epochs = 10
+    cfg.runner.max_epochs = 1
+    cfg.rtotal_epochs = 1
     cfg.optimizer.lr = opt.lr
 
     cfg.lr_config = dict(
@@ -173,7 +201,7 @@ def main(opt):
         warmup='linear', # The warmup policy, also support `exp` and `constant`.
         warmup_iters=500, # The number of iterations for warmup
         warmup_ratio=0.001, # The ratio of the starting learning rate used for warmup
-        min_lr=1e-04)
+        min_lr=1e-07)
 
     cfg.log_config.interval = 600
     cfg.checkpoint_config.interval = 1
@@ -187,6 +215,7 @@ def main(opt):
     bind_model(model)    
 
     train_detector(model, datasets[0], cfg, distributed=False, validate=True)
+
 
 if __name__ == "__main__":
     opt = get_args()

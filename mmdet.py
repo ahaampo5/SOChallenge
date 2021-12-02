@@ -1,13 +1,14 @@
 import os
-import json
 from argparse import ArgumentParser
 import torch
 from torch.utils.data import DataLoader
 import glob
+import mmcv
+import time
 
 # baseline model
 from src.model import BASELINE_MODEL
-from src.utils import train, generate_dboxes, Encoder, BaseTransform
+from src.utils import train, generate_dboxes, Encoder, BaseTransform, weights_to_cpu, get_state_dict
 from src.loss import Loss
 from src.dataset import collate_fn, Small_dataset, prepocessing,\
     coco_dict, convert_to_coco_train, convert_to_coco_valid,\
@@ -38,16 +39,21 @@ def test_preprocessing(img, transform=None):
 
 def bind_model(model):
     def save(dir_path, **kwargs):
+        meta = {}
+        meta.update(mmcv_version=mmcv.__version__, time=time.asctime())
+        if hasattr(model, 'CLASSES') and model.CLASSES is not None:
+            # save class name to the meta
+            meta.update(CLASSES=model.CLASSES)
         checkpoint = {
-            "model": model.state_dict()}
+            'meta': meta,
+            'state_dict': weights_to_cpu(get_state_dict(model))
+        }
         torch.save(checkpoint, os.path.join(dir_path, 'model.pt'))
         print("model saved!")
 
     def load(dir_path):
-        tmp_path = dir_path
-
-        checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
-        model.load_state_dict(checkpoint)
+        checkpoint_path = os.path.join(dir_path, 'model.pt')
+        checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
@@ -60,7 +66,7 @@ def bind_model(model):
 
         CUR_PATH = os.getcwd()
         CFG_PATH = os.path.join("/app/configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
-        PREFIX = tmp_path
+        PREFIX = dir_name
         WORK_DIR = os.path.join('/app/work_dir')
 
         cfg = Config.fromfile(CFG_PATH)

@@ -3,6 +3,10 @@ import itertools
 from math import sqrt
 from tqdm import tqdm
 
+from mmcv.parallel import is_module_wrapper
+from collections import OrderedDict
+
+
 import torch
 import torch.nn.functional as F
 from torchvision.ops.boxes import box_iou, box_convert
@@ -212,6 +216,23 @@ def train(model, train_loader, epoch, criterion, optimizer, scheduler):
 
     return float(loss.item()) # 에러 확인
 
+
+def _save_to_state_dict(module, destination, prefix, keep_vars):
+    """Saves module state to `destination` dictionary.
+    This method is modified from :meth:`torch.nn.Module._save_to_state_dict`.
+    Args:
+        module (nn.Module): The module to generate state_dict.
+        destination (dict): A dict where state will be stored.
+        prefix (str): The prefix for parameters and buffers used in this
+            module.
+    """
+    for name, param in module._parameters.items():
+        if param is not None:
+            destination[prefix + name] = param if keep_vars else param.detach()
+    for name, buf in module._buffers.items():
+        # remove check of _non_persistent_buffers_set to allow nn.BatchNorm2d
+        if buf is not None:
+            destination[prefix + name] = buf if keep_vars else buf.detach()
 
 def get_state_dict(module, destination=None, prefix='', keep_vars=False):
     """Returns a dictionary containing a whole state of the module.

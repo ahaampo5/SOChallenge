@@ -128,7 +128,6 @@ def convert_to_coco_train(json_path, classes, coco_dict):
         json_data = json.load(jfile) # dict
 
         for key in json_data:
-<<<<<<< HEAD
             if key.split('.')[0] in train_indices:
                 img.append({'id':img_idx, 'file_name': key, 'height':2100, 'width':2800})
             
@@ -140,18 +139,6 @@ def convert_to_coco_train(json_path, classes, coco_dict):
                     anno_idx += 1
                 img_idx += 1
             
-=======
-            img.append({'id':img_idx, 'file_name': key, 'height':2100, 'width':2800})
-        
-            for label, x, y, w, h in json_data[key]:
-                label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
-                annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
-                                'ignore':0, 'segmentation': []})
-                classes_count[int(label)] += 1
-                anno_idx += 1
-            img_idx += 1
-
->>>>>>> 2c10e068145aee30e463ae37bfbcdcb4a1340044
     coco_dict['images'] = img
     coco_dict['annotations'] = annotations
     coco_dict['categories'] = categories
@@ -220,7 +207,7 @@ def convert_to_coco_test(img_paths, classes, coco_dict):
     for img_idx, img_path in enumerate(img_paths):
         file_name = img_path.split('/')[-1]
         img.append({'id':img_idx, 'file_name': file_name, 'height':2100, 'width':2800})
-        
+
     img_idx = 0
     for _ in range(len(img_paths)):
         label, x, y, w, h = 0, 0, 0, 1, 1

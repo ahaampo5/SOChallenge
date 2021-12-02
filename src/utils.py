@@ -211,3 +211,57 @@ def train(model, train_loader, epoch, criterion, optimizer, scheduler):
         scheduler.step()
 
     return float(loss.item()) # 에러 확인
+
+
+def get_state_dict(module, destination=None, prefix='', keep_vars=False):
+    """Returns a dictionary containing a whole state of the module.
+    Both parameters and persistent buffers (e.g. running averages) are
+    included. Keys are corresponding parameter and buffer names.
+    This method is modified from :meth:`torch.nn.Module.state_dict` to
+    recursively check parallel module in case that the model has a complicated
+    structure, e.g., nn.Module(nn.Module(DDP)).
+    Args:
+        module (nn.Module): The module to generate state_dict.
+        destination (OrderedDict): Returned dict for the state of the
+            module.
+        prefix (str): Prefix of the key.
+        keep_vars (bool): Whether to keep the variable property of the
+            parameters. Default: False.
+    Returns:
+        dict: A dictionary containing a whole state of the module.
+    """
+    # recursively check parallel module in case that the model has a
+    # complicated structure, e.g., nn.Module(nn.Module(DDP))
+    if is_module_wrapper(module):
+        module = module.module
+
+    # below is the same as torch.nn.Module.state_dict()
+    if destination is None:
+        destination = OrderedDict()
+        destination._metadata = OrderedDict()
+    destination._metadata[prefix[:-1]] = local_metadata = dict(
+        version=module._version)
+    _save_to_state_dict(module, destination, prefix, keep_vars)
+    for name, child in module._modules.items():
+        if child is not None:
+            get_state_dict(
+                child, destination, prefix + name + '.', keep_vars=keep_vars)
+    for hook in module._state_dict_hooks.values():
+        hook_result = hook(module, destination, prefix, local_metadata)
+        if hook_result is not None:
+            destination = hook_result
+    return destination
+
+def weights_to_cpu(state_dict):
+    """Copy a model state_dict to cpu.
+    Args:
+        state_dict (OrderedDict): Model weights on GPU.
+    Returns:
+        OrderedDict: Model weights on GPU.
+    """
+    state_dict_cpu = OrderedDict()
+    for key, val in state_dict.items():
+        state_dict_cpu[key] = val.cpu()
+    # Keep metadata in state_dict
+    state_dict_cpu._metadata = getattr(state_dict, '_metadata', OrderedDict())
+    return state_dict_cpu

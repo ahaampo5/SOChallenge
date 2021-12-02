@@ -28,7 +28,6 @@ from mmdet.datasets import build_dataloader, build_dataset, replace_ImageToTenso
 from mmdet.utils import collect_env, get_root_logger
 
 
-
 # only infer
 def test_preprocessing(img, transform=None):
     # [참가자 TO-DO] inference를 위한 이미지 데이터 전처리
@@ -45,8 +44,10 @@ def bind_model(model):
         print("model saved!")
 
     def load(dir_path):
+        tmp_path = dir_path
+
         checkpoint = torch.load(os.path.join(dir_path, 'model.pt'))
-        model.load_state_dict(checkpoint["model"])
+        model.load_state_dict(checkpoint)
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
@@ -59,7 +60,7 @@ def bind_model(model):
 
         CUR_PATH = os.getcwd()
         CFG_PATH = os.path.join("/app/configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
-        PREFIX = dir_name
+        PREFIX = tmp_path
         WORK_DIR = os.path.join('/app/work_dir')
 
         cfg = Config.fromfile(CFG_PATH)
@@ -106,7 +107,6 @@ def bind_model(model):
                     ])
             result_dict[file_name] = detections
         return result_dict
-
 
     # DONOTCHANGE: They are reserved for nsml
     nsml.bind(save=save, load=load, infer=infer)
@@ -204,7 +204,7 @@ def main(opt):
     if opt.pause:
         nsml.paused(scope=locals())
     else: 
-
+        
         train_detector(model, datasets[0], cfg, distributed=distributed, validate=True)
 
         nsml.save(0)

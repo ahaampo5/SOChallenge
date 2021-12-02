@@ -57,7 +57,6 @@ def bind_model(model):
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
-
         dir_name = os.path.dirname(test_img_path_list[0])
         classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
@@ -85,34 +84,50 @@ def bind_model(model):
 
         dataset = build_dataset(cfg.data.test)
         data_loader = build_dataloader(
-                dataset,
-                samples_per_gpu=1,
-                workers_per_gpu=cfg.data.workers_per_gpu,
-                dist=False,
-                shuffle=False)
+                    dataset,
+                    samples_per_gpu=1,
+                    workers_per_gpu=cfg.data.workers_per_gpu,
+                    dist=False,
+                    shuffle=False
+                    )
 
         model.CLASSES = dataset.CLASSES
-        model = MMDataParallel(model.cuda(), device_ids=[0])
+        net = MMDataParallel(model.cuda(), device_ids=[0])
 
-        output = single_gpu_test(model, data_loader, show_score_thr=0.05)
         class_num = 30
 
         result_dict = {}
-        for out in zip(output, test_img_path_list):
-            file_name = test_img_path_list.split('/')[-1]
+        for test_img in test_img_path_list:
+            file_name = test_img.split('/')[-1]
+            result_dict[file_name] = []
+
+        net.eval()
+        flag=True 
+        for data, img in zip(data_loader, test_img_path_list):
+            with torch.no_grad():
+                result = net(return_loss=False, rescale=True, **data)
+            file_name = img.split('/')[-1]
             detections = []
+            if flag:
+                print(result)
+                flag = False
             for j in range(class_num):
-                for o in out[j]:
-                    detections.append([
-                        o[j],
-                        o[0],
-                        o[1],
-                        o[2]-o[0],
-                        o[3]-o[1],
-                        o[4]
-                    ])
+                try:
+                    for o in result[j]:
+                        detections.append([
+                            j,
+                            float(o[0]),
+                            float(o[1]),
+                            float(o[2]-o[0]),
+                            float(o[3]-o[1]),
+                            float(o[4])
+                        ])
+                except:
+                    continue
             result_dict[file_name] = detections
+        print(result_dict)
         return result_dict
+
 
     # DONOTCHANGE: They are reserved for nsml
     nsml.bind(save=save, load=load, infer=infer)
@@ -176,8 +191,8 @@ def main(opt):
             cfg.gpu_ids = range(world_size)
 
         cfg.work_dir = WORK_DIR
-        cfg.runner.max_epochs = 0
-        cfg.rtotal_epochs = 0
+        cfg.runner.max_epochs = 1
+        cfg.rtotal_epochs = 1
         cfg.optimizer = dict(type='Adam', lr=opt.lr, weight_decay=0.0001)
 
         cfg.lr_config = dict(
@@ -198,24 +213,21 @@ def main(opt):
         datasets = [build_dataset(cfg.data.train)]
         model.CLASSES = datasets[0].CLASSES
 
-        bind_model(model)
     else:
         CFG_PATH = os.path.join("/app/configs/cascade_rcnn/cascade_rcnn_swin_tiny_fpn_1x_coco.py")
 
         # config file 들고오기
         cfg = Config.fromfile(CFG_PATH)
+        cfg.model.pretrained = None
         model = build_detector(cfg.model)
         
-        bind_model(model)
+    bind_model(model)
 
     if opt.pause:
         nsml.paused(scope=locals())
     else: 
-        
         train_detector(model, datasets[0], cfg, distributed=distributed, validate=True)
-
-        nsml.save(0)
-
+        nsml.save(10)
 if __name__ == "__main__":
     opt = get_args()
     main(opt)

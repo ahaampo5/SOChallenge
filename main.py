@@ -53,7 +53,7 @@ def bind_model(model):
             ])
         dboxes = generate_dboxes() 
         encoder = Encoder(dboxes) # inference시 박스 좌표로 후처리하는 모듈
-
+        
         model.cuda()
         model.eval()
 

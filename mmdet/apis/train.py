@@ -98,9 +98,8 @@ def train_detector(model,
             broadcast_buffers=False,
             find_unused_parameters=find_unused_parameters)
     else:
-        # model = MMDataParallel(
-        #     model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
-        model.to('cpu')
+        model = MMDataParallel(
+            model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
 
     if 'runner' not in cfg:
         cfg.runner = {

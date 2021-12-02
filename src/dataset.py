@@ -4,7 +4,7 @@ from torch.utils.data.dataloader import default_collate
 import os, json
 import numpy as np
 from PIL import Image
-import pickle
+
 from tqdm import tqdm
 from collections import defaultdict
 
@@ -105,7 +105,7 @@ coco_dict = dict(
 def convert_to_coco_train(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
 
-    train_indices = list(map(lambda x:str(x), range(17173)[17173//5:]))
+    train_indices = list(map(lambda x:str(x), range(17173)[17173//2:]))
 
     img = []
     annotations = []
@@ -202,15 +202,13 @@ def convert_to_coco_test(img_paths, classes, coco_dict):
     for img_path in img_paths:
         file_name = img_path.split('/')[-1]
         img.append({'id':img_idx, 'file_name': file_name, 'height':2100, 'width':2800})
-    
-    for _ in range(len(img_paths)):
+        
         label,x,y,w,h = 0, 0, 0, 1, 1
         annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h),\
             'area':w*h, 'iscrowd':0, 'ignore':0, 'segmentation': []})
-
+        img_idx += 1
         anno_idx += 1
-    img_idx += 1
-
+    
     coco_dict['images'] = img
     coco_dict['annotations'] = annotations
     coco_dict['categories'] = categories

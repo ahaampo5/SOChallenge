@@ -106,7 +106,8 @@ coco_dict = dict(
 def convert_to_coco_train(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
 
-    train_indices = list(map(lambda x:str(x), range(17173)[17173//10:]))
+    train_indices = list(map(lambda x:str(x), range(17173)))
+    # train_indices = map(lambda x:str(x), range(17173)[:17173//])
 
     area_count = defaultdict()
 
@@ -150,7 +151,7 @@ def convert_to_coco_train(json_path, classes, coco_dict):
 def convert_to_coco_valid(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
     
-    valid_indices = map(lambda x:str(x), range(17173)[:17173//10])
+    valid_indices = map(lambda x:str(x), range(17173)[:10])
 
     img = []
     annotations = []

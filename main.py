@@ -112,7 +112,6 @@ def bind_model(model):
         model.CLASSES = dataset.CLASSES
         net = MMDataParallel(model.cuda(), device_ids=[0])
 
-        # output = single_gpu_test(net, data_loader, show_score_thr=0.05)
         class_num = 30
 
         result_dict = {}
@@ -121,16 +120,14 @@ def bind_model(model):
             result_dict[file_name] = []
 
         net.eval()
-        if (len(data_loader) != len(test_img_path_list)):
-            raise NotImplementedError()
 
         for data, img in zip(data_loader, test_img_path_list):
             with torch.no_grad():
-                result = net(return_loss=False, rescale=True, **data)
+                result = net(return_loss=False, rescale=True, **data)[0]
             file_name = img.split('/')[-1]
             detections = []
-            try:
-                for j in range(class_num):
+            for j in range(class_num):
+                try:
                     for o in result[j]:
                         detections.append([
                             j,
@@ -140,9 +137,8 @@ def bind_model(model):
                             float(o[3]-o[1]),
                             float(o[4])
                         ])
-            except:
-                result_dict[file_name] = []
-                pass
+                except:
+                    continue
             result_dict[file_name] = detections
             
         return result_dict
@@ -190,6 +186,7 @@ def main(opt):
 
         cfg.data.train.classes = classes
         cfg.data.train.img_prefix = PREFIX
+
         cfg.data.train.ann_file = CUR_PATH + "/all_train.json"
 
         cfg.data.val.classes = classes
@@ -198,15 +195,15 @@ def main(opt):
 
         # data
         cfg.data.samples_per_gpu = opt.batch_size
-        cfg.data.workers_per_gpu = 4
+        cfg.data.workers_per_gpu = 2
 
         cfg.optimizer = dict(type='Adam', lr=1e-4, weight_decay=1e-5)
 
         cfg.seed = 42
         cfg.gpu_ids = [0]
         cfg.work_dir = WORK_DIR
-        cfg.runner.max_epochs = 0
-        cfg.rtotal_epochs = 0
+        cfg.runner.max_epochs = 20
+        cfg.rtotal_epochs = 20
         cfg.optimizer.lr = opt.lr
 
         cfg.lr_config = dict(
@@ -238,10 +235,7 @@ def main(opt):
         nsml.paused(scope=locals())
     else:
         train_detector(model, datasets[0], cfg, distributed=False, validate=True)
-        nsml.save(0)
-
-
-    nsml.save(0)
+        
 
 if __name__ == "__main__":
     opt = get_args()

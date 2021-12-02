@@ -26,6 +26,9 @@ from torch.utils.data.distributed import DistributedSampler
 # wbf
 from ensemble_boxes import *
 
+# IMAGE SIZE
+IMAGE_SIZE = 1024
+
 # only infer
 def test_preprocessing(img, transform=None):
     # [참가자 TO-DO] inference를 위한 이미지 데이터 전처리
@@ -46,12 +49,12 @@ def bind_model(model):
 
     def get_test_transform():
         return A.Compose([
-            A.Resize(512,512),
+            A.Resize(IMAGE_SIZE, IMAGE_SIZE),
             ToTensorV2(p=1.0)
         ])
 
     def run_wbf(pred, iou_thr=0.5, skip_box_thr=0.05, weights=None):
-        boxes = (pred['boxes']/512.).tolist()
+        boxes = (pred['boxes']/1024.).tolist()
         scores = pred['scores'].tolist()
         labels = pred['labels'].tolist()
         boxes, scores, labels = weighted_boxes_fusion([boxes], [scores], [labels], weights=None, iou_thr=iou_thr, skip_box_thr=skip_box_thr)
@@ -74,7 +77,7 @@ def bind_model(model):
             file_name = file_path.split("/")[-1]
             img = cv2.imread(file_path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32)
-            img /= 255.0
+            #img /= 255.0
 
             width = img.shape[1]
             height = img.shape[0]
@@ -126,7 +129,7 @@ def bind_model(model):
 def get_args():
     parser = ArgumentParser(description="NSML BASELINE")
     parser.add_argument("--epochs", type=int, default=20, help="number of total epochs to run")
-    parser.add_argument("--batch-size", type=int, default=8, help="number of samples for each iteration")
+    parser.add_argument("--batch-size", type=int, default=4, help="number of samples for each iteration")
     parser.add_argument("--lr", type=float, default=0.001, help="initial learning rate")
     parser.add_argument("--nms-threshold", type=float, default=0.5)
     parser.add_argument("--num-workers", type=int, default=0)
@@ -140,7 +143,7 @@ def get_args():
 
 def get_train_transform():
     return A.Compose([
-        A.Resize(512,512),
+        A.Resize(1024,1024),
         A.HorizontalFlip(p=0.5),
         A.RandomRotate90(p=0.3),
         A.VerticalFlip(p=0.4),
@@ -172,7 +175,7 @@ def main(gpu, opt, n_gpus):
         with open(os.path.join(DATASET_PATH, 'train', 'train_label'), 'r', encoding="utf-8") as f:
             train_data_dict = json.load(f)
             train_img_label = prepocessing(root_dir=os.path.join(DATASET_PATH, 'train', 'train_data'),\
-                label_data=train_data_dict, input_size=(512,512))
+                label_data=train_data_dict, input_size=(IMAGE_SIZE, IMAGE_SIZE))
         
 
         train_data = Small_dataset(train_img_label, get_train_transform())

@@ -102,15 +102,13 @@ def bind_model(model):
             result_dict[file_name] = []
 
         net.eval()
-        flag=True 
+
         for data, img in zip(data_loader, test_img_path_list):
             with torch.no_grad():
-                result = net(return_loss=False, rescale=True, **data)
+                result = net(return_loss=False, rescale=True, **data)[0]
             file_name = img.split('/')[-1]
             detections = []
-            if flag:
-                print(result)
-                flag = False
+
             for j in range(class_num):
                 try:
                     for o in result[j]:
@@ -125,9 +123,8 @@ def bind_model(model):
                 except:
                     continue
             result_dict[file_name] = detections
-        print(result_dict)
-        return result_dict
 
+        return result_dict
 
     # DONOTCHANGE: They are reserved for nsml
     nsml.bind(save=save, load=load, infer=infer)
@@ -191,8 +188,8 @@ def main(opt):
             cfg.gpu_ids = range(world_size)
 
         cfg.work_dir = WORK_DIR
-        cfg.runner.max_epochs = 1
-        cfg.rtotal_epochs = 1
+        cfg.runner.max_epochs = 20
+        cfg.rtotal_epochs = 20
         cfg.optimizer = dict(type='Adam', lr=opt.lr, weight_decay=0.0001)
 
         cfg.lr_config = dict(

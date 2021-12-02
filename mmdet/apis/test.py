@@ -54,11 +54,13 @@ def single_gpu_test(model,
                     show=show,
                     out_file=out_file,
                     score_thr=show_score_thr)
-
+        print("------", len(result))
         # encode mask results
         if isinstance(result[0], tuple):
             result = [(bbox_results, encode_mask_results(mask_results))
                       for bbox_results, mask_results in result]
+        else:
+            result = [() for _ in range(len(result))]
         results.extend(result)
 
         for _ in range(batch_size):

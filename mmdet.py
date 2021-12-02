@@ -97,8 +97,8 @@ def bind_model(model):
 
         output = single_gpu_test(net, data_loader, show_score_thr=0.05)
         class_num = 30
-
-        result_dict = {}
+        print(output)
+        result_dict = { file.split('/')[-1]:[] for file in test_img_path_list }
         for out, img in zip(output, test_img_path_list):
             file_name = img.split('/')[-1]
             detections = []
@@ -114,7 +114,7 @@ def bind_model(model):
                             float(o[4])
                         ])
             except:
-                continue
+                pass
             result_dict[file_name] = detections
         return result_dict
 
@@ -214,7 +214,8 @@ def main(opt):
     if opt.pause:
         nsml.paused(scope=locals())
     else: 
-        
+        nsml.save(1)
+
         train_detector(model, datasets[0], cfg, distributed=distributed, validate=True)
 
         nsml.save(10)

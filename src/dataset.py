@@ -125,13 +125,13 @@ def convert_to_coco_train(json_path, classes, coco_dict):
         for key in json_data:
             img.append({'id':img_idx, 'file_name': key, 'height':2100, 'width':2800})
         
-        for label, x, y, w, h in json_data[key]:
-            label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
-            annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
+            for label, x, y, w, h in json_data[key]:
+                label,x,y,w,h = int(label), int(x), int(y), int(w), int(h)
+                annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
                             'innore':0, 'segmentation': []})
-            classes_count[int(label)] += 1
-            anno_idx += 1
-        img_idx += 1
+                classes_count[int(label)] += 1
+                anno_idx += 1
+            img_idx += 1
             
     coco_dict['images'] = img
     coco_dict['annotations'] = annotations
@@ -141,12 +141,12 @@ def convert_to_coco_train(json_path, classes, coco_dict):
     with open(os.path.join(CUR_PATH, 'all_train.json'), 'w', encoding='utf-8') as jfile:
         json.dump(coco_dict, jfile)
   
-    return classes_count
+    return classes_count, coco_dict
 
 def convert_to_coco_valid(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
     
-    valid_indices = map(lambda x:str(x), range(17173)[:17173//5])
+    valid_indices = [map(lambda x:str(x), range(17173)[:17173//5])]
 
     img = []
     annotations = []

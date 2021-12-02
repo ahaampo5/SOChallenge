@@ -1,4 +1,4 @@
-from mmcv.runner import Hooks, Hook, master_only
+from mmcv.runner import HOOKS, Hook, master_only
 import nsml
 
 @HOOKS.register_module()

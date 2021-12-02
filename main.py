@@ -82,20 +82,40 @@ def bind_model(model):
             img = test_preprocessing(img, get_test_transform())
             img = img.cuda()
             detections = []
+            count = 0
 
             with torch.no_grad():
                 pred = model(img)[0]
-                boxes, scores, labels = run_wbf(pred, iou_thr=0.5, skip_box_thr=0.05)
-                
+                try:
+                    boxes, scores, labels = run_wbf(pred, iou_thr=0.5, skip_box_thr=0.05)
+                except:
+                    continue
+
+                '''
+                wbf_pred = []
+                wbf_pred.append(boxes)
+                wbf_pred.append(scores)
+                wbf_pred.append(labels)
+
+                wbf_pred = np.array(wbf_pred)
+                wbf_pred = np.transpose(wbf_pred)
+                wbf_pred = sorted(wbf_pred, key=lambda x:x[1], reverse=True)
+                wbf_pred = np.transpose(wbf_pred)
+                wbf_pred = [list(t) for t in wbf_pred]
+                boxes, scores, labels = wbf_pred
+                '''
                 for box_, score_, label_ in zip(boxes, scores, labels):
-                    detections.append([
-                        int(label_)-1,
-                        float( box_[0] * width ), 
-                        float( box_[1] * height ), 
-                        float( (box_[2] - box_[0]) * width ),
-                        float( (box_[3] - box_[1]) * height ), 
-                        float( score_ )
-                        ])
+                    try:
+                        detections.append([
+                            int(label_)-1,
+                            float( box_[0] * width ),
+                            float( box_[1] * height ), 
+                            float( (box_[2] - box_[0]) * width ),
+                            float( (box_[3] - box_[1]) * height ), 
+                            float( score_ )
+                            ])
+                    except:
+                        continue
 
             result_dict[file_name] = detections # 반환 형식 준수해야 함
         return result_dict
@@ -105,7 +125,7 @@ def bind_model(model):
 
 def get_args():
     parser = ArgumentParser(description="NSML BASELINE")
-    parser.add_argument("--epochs", type=int, default=10, help="number of total epochs to run")
+    parser.add_argument("--epochs", type=int, default=20, help="number of total epochs to run")
     parser.add_argument("--batch-size", type=int, default=8, help="number of samples for each iteration")
     parser.add_argument("--lr", type=float, default=0.001, help="initial learning rate")
     parser.add_argument("--nms-threshold", type=float, default=0.5)

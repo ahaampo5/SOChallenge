@@ -3,9 +3,9 @@ import itertools
 from math import sqrt
 from tqdm import tqdm
 
+
 from mmcv.parallel import is_module_wrapper
 from collections import OrderedDict
-
 
 import torch
 import torch.nn.functional as F
@@ -286,3 +286,4 @@ def weights_to_cpu(state_dict):
     # Keep metadata in state_dict
     state_dict_cpu._metadata = getattr(state_dict, '_metadata', OrderedDict())
     return state_dict_cpu
+

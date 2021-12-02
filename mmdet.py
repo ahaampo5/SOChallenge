@@ -171,6 +171,7 @@ def main(opt):
     
     classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
+
     if not opt.pause:    
         convert_to_coco_train(os.path.join(DATASET_PATH, 'train', 'train_label'),
                 classes, coco_dict
@@ -239,6 +240,8 @@ def main(opt):
         train_detector(model, datasets[0], cfg, distributed=False, validate=True)
         nsml.save(0)
 
+
+    nsml.save(0)
 
 if __name__ == "__main__":
     opt = get_args()

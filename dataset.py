@@ -7,6 +7,8 @@ from PIL import Image
 import pickle
 from tqdm import tqdm
 
+from collections import defaultdict
+
 def collate_fn(batch):
     items = list(zip(*batch))
     items[0] = default_collate([i for i in items[0] if torch.is_tensor(i)])
@@ -103,6 +105,7 @@ coco_dict = dict(
 
 def convert_to_coco_train(json_path, classes, coco_dict):
     classes_count = {key:value for key, value in zip(range(30), [0]*30)}
+    area_count = defaultdict(lambda : 0)
 
     img = []
     annotations = []
@@ -127,6 +130,8 @@ def convert_to_coco_train(json_path, classes, coco_dict):
             annotations.append({'id':anno_idx, 'image_id':img_idx, 'category_id':label, 'bbox':(x,y,w,h), 'area':w*h, 'iscrowd':0,\
                             'ignore':0, 'segmentation': []})
             classes_count[int(label)] += 1
+            area_count[w*h] += 1
+            
             anno_idx += 1
         img_idx += 1
             

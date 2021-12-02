@@ -7,7 +7,9 @@ log_config = dict(
         # dict(type='TensorboardLoggerHook')
     ])
 # yapf:enable
-custom_hooks = [dict(type='NumClassCheckHook')]
+
+custom_hooks = [dict(type='NumClassCheckHook'), dict(type='MyHook')]
+
 
 dist_params = dict(backend='nccl')
 log_level = 'INFO'

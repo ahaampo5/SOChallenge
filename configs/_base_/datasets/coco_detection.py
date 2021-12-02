@@ -5,22 +5,50 @@ img_norm_cfg = dict(
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='Resize', img_scale=(1024, 768), keep_ratio=True),
+
+    dict(type='Resize', img_scale=[(1440, 800),(1024, 1024), (800, 800)], 
+        multiscale_mode='value', keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
+    dict(
+        type='AutoAugment',
+        policies=[[
+            dict(type='Shear', level=3),
+            dict(type='Rotate', level=8),
+            dict(type='Translate', level=8),
+        ],
+        [
+            dict(type='ColorTransform', level=3),
+            dict(type='EqualizeTransform'),
+            dict(type='BrightnessTransform', level=4),
+            dict(type='ContrastTransform', level=4)
+        ],
+        [
+            dict(type='Shear', level=4),
+            dict(type='Rotate', level=6),
+            dict(type='Translate', level=8),
+            dict(type='ColorTransform', level=5),
+            dict(type='EqualizeTransform'),
+            dict(type='BrightnessTransform', level=3),
+            dict(type='ContrastTransform', level=4)
+        ],
+        ]
+    ),
+
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
+
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(1024, 768),
-        flip=False,
+
+        img_scale=[(1440, 1440), (1024, 1024), (768, 768)],
+        flip=True,
         transforms=[
             dict(type='Resize', keep_ratio=True),
-            dict(type='RandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='Pad', size_divisor=32),
             dict(type='ImageToTensor', keys=['img']),

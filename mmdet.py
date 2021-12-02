@@ -57,7 +57,7 @@ def bind_model(model):
         print('model loaded!')
 
     def infer(test_img_path_list): # data_loader에서 인자 받음
-        
+
         dir_name = os.path.dirname(test_img_path_list[0])
         classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
@@ -136,6 +136,7 @@ def main(opt):
 
     classes = ['SD카드', '웹캠', 'OTP', '계산기', '목걸이', '넥타이핀', '십원', '오십원', '백원', '오백원', '미국지폐', '유로지폐', '태국지폐', '필리핀지폐',
             '밤', '브라질너트', '은행', '피칸', '호두', '호박씨', '해바라기씨', '줄자', '건전지', '망치', '못', '나사못', '볼트', '너트', '타카', '베어링']
+    model = None
     if not opt.pause:
         convert_to_coco_train(os.path.join(DATASET_PATH, 'train', 'train_label'),
                 classes, coco_dict
@@ -203,7 +204,7 @@ def main(opt):
 
         # config file 들고오기
         cfg = Config.fromfile(CFG_PATH)
-        model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
+        model = build_detector(cfg.model)
         
         bind_model(model)
 

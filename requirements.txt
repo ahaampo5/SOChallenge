@@ -12,14 +12,12 @@ imagecorruptions
 mmlvis
 scipy
 sklearn
-
 matplotlib
 mmpycocotools
 numpy
 six
 terminaltables
 timm
-
 asynctest
 codecov
 flake8

@@ -2,14 +2,12 @@ import os
 from argparse import ArgumentParser
 import torch
 from torch.utils.data import DataLoader
-import glob
+
 import mmcv
 import time
 
 # baseline model
-from src.model import BASELINE_MODEL
-from src.utils import train, generate_dboxes, Encoder, BaseTransform, weights_to_cpu, get_state_dict
-from src.loss import Loss
+from src.utils import weights_to_cpu, get_state_dict
 from src.dataset import collate_fn, Small_dataset, prepocessing,\
     coco_dict, convert_to_coco_train, convert_to_coco_valid,\
     convert_to_coco_test
@@ -28,14 +26,6 @@ from mmdet.apis import train_detector, set_random_seed, init_detector, single_gp
 from mmdet.datasets import build_dataloader, build_dataset, replace_ImageToTensor
 from mmdet.utils import collect_env, get_root_logger
 
-
-# only infer
-def test_preprocessing(img, transform=None):
-    # [참가자 TO-DO] inference를 위한 이미지 데이터 전처리
-    if transform is not None:
-        img = transform(img)
-        img = img.unsqueeze(0)
-    return img
 
 def bind_model(model):
     def save(dir_path, **kwargs):

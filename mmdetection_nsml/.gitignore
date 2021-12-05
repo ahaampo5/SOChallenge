@@ -1,0 +1,13 @@
+.dev_scripts
+
+test/
+
+.nsmlignore
+
+.pre-commit-config.yaml
+
+.readthedocs.yml
+
+pytest.ini
+
+setup.cfg

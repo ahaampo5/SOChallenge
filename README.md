@@ -34,4 +34,5 @@ nsml submit [세션명] [모델_checkpoint_번호]
 - mmdetection 실험 환경 구축
   - Docker 실험 환경 세팅
   - MMdet Train, Inference 함수 구현
-  - EDA (imbalance 문제 해결)
+- EDA
+  - Imbalance 문제 개선

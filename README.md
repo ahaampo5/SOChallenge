@@ -30,3 +30,8 @@ $ nsml submit -t [세션명] [모델_checkpoint_번호]
 # 제출 후 리더보드에서 점수 확인 가능
 nsml submit [세션명] [모델_checkpoint_번호]
 ```
+## 기여한 일
+- mmdetection 실험 환경 구축
+  - Docker 실험 환경 세팅
+  - MMdet Train, Inference 함수 구현
+  - EDA (imbalance 문제 해결)

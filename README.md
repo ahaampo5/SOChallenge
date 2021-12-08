@@ -1,11 +1,11 @@
 # Baseline code
 주제1. Small Object Detection 모델 개발
 
-<img src=https://user-images.githubusercontent.com/60084351/145232746-43cfc489-1980-469a-a8da-a44ff9d9e6af.png width='200'>
+<img src=https://user-images.githubusercontent.com/60084351/145232746-43cfc489-1980-469a-a8da-a44ff9d9e6af.png width='400'>
 
-<img src=https://user-images.githubusercontent.com/60084351/145232835-6407fb91-329b-4e47-876b-ed89c99c015e.png width='200'>
+<img src=https://user-images.githubusercontent.com/60084351/145232835-6407fb91-329b-4e47-876b-ed89c99c015e.png width='400'>
 
-<img src=https://user-images.githubusercontent.com/60084351/145232567-360cdb0c-2168-43c7-8726-31a613019df0.png width='200'>
+<img src=https://user-images.githubusercontent.com/60084351/145232567-360cdb0c-2168-43c7-8726-31a613019df0.png width='400'>
 
 ## 실행 방법
 ```bash

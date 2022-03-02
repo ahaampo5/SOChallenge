@@ -1,11 +1,19 @@
-# Baseline code
-주제1. Small Object Detection 모델 개발
+# NSML Small Object Detection Competition
+
+# Task Description
+
+본 대회의 주제는 고해상도 이미지 내의 100x100 이하의 소형 객체 검출 문제입니다. 일반적인 Detection와 다르게 데이터 imbalance와 positive negative imbalance 문제가 동시에 존재하기 때문에 이를 해결하기 위한 실험이 필요합니다.
 
 <img src=https://user-images.githubusercontent.com/60084351/145232746-43cfc489-1980-469a-a8da-a44ff9d9e6af.png width='400'>
 
 <img src=https://user-images.githubusercontent.com/60084351/145232835-6407fb91-329b-4e47-876b-ed89c99c015e.png width='400'>
 
 <img src=https://user-images.githubusercontent.com/60084351/145232567-360cdb0c-2168-43c7-8726-31a613019df0.png width='400'>
+
+### Data
+- 학습 데이터 : 17173 장
+- 테스트 데이터 : 1000 장
+
 
 ## 실행 방법
 ```bash
@@ -30,9 +38,10 @@ $ nsml submit -t [세션명] [모델_checkpoint_번호]
 # 제출 후 리더보드에서 점수 확인 가능
 nsml submit [세션명] [모델_checkpoint_번호]
 ```
-## 기여한 일
-- mmdetection 실험 환경 구축
+
+## Contribution
+- NSML 환경에 맞춘 mmdetection 실험 환경 구축
   - Docker 실험 환경 세팅
   - MMdet Train, Inference 함수 구현
 - EDA
-  - Imbalance 문제 개선
+  - Imbalance 문제 개선 (Loss 실험, sampler 실험)
